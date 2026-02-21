@@ -61,9 +61,7 @@ model = None
 model_name = None
 
 model_priority = [
-    ('vgg16_finetuned.h5', 'VGG16 Fine-tuned'),
-    ('vgg16_best.h5', 'VGG16 Best'),
-    ('baseline_best.h5', 'CNN Baseline')
+    ('mobilenet_pneumonia.h5', 'MobileNet Pneumonia'),
 ]
 
 for filename, name in model_priority:
