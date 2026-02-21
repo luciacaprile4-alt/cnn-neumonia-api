@@ -124,7 +124,7 @@ def make_prediction(img_array: np.ndarray) -> dict:
         img_array: Imagen preprocesada
 
     Returns:
-        dict: Resultado con predicción y probabilidades
+        dict: Resultado con predicción y mensaje descriptivo
     """
     if model is None:
         raise HTTPException(
@@ -137,12 +137,40 @@ def make_prediction(img_array: np.ndarray) -> dict:
     predicted_class = "PNEUMONIA" if prediction > 0.5 else "NORMAL"
     confidence = float(prediction if prediction > 0.5 else 1 - prediction)
 
+    # Nivel de confianza en palabras
+    if confidence >= 0.90:
+        nivel_confianza = "Alta"
+    elif confidence >= 0.70:
+        nivel_confianza = "Media"
+    else:
+        nivel_confianza = "Baja"
+
+    # Mensajes descriptivos según resultado
+    mensajes = {
+        "NORMAL": {
+            "titulo": "Resultado: Normal",
+            "descripcion": "La radiografía no presenta signos evidentes de neumonía. Los pulmones lucen dentro de parámetros normales.",
+            "recomendacion": "Continúa con tus controles médicos regulares."
+        },
+        "PNEUMONIA": {
+            "titulo": "Resultado: Neumonía detectada",
+            "descripcion": "La radiografía presenta patrones compatibles con neumonía.",
+            "recomendacion": "Se recomienda consultar a un médico a la brevedad para confirmar el diagnóstico y recibir tratamiento."
+        }
+    }
+
+    mensaje = mensajes[predicted_class]
+
     result = {
+        "titulo": mensaje["titulo"],
+        "descripcion": mensaje["descripcion"],
+        "recomendacion": mensaje["recomendacion"],
         "prediction": predicted_class,
-        "confidence": confidence,
+        "confidence": f"{confidence:.1%}",
+        "nivel_confianza": nivel_confianza,
         "probabilities": {
-            "NORMAL": float(1 - prediction),
-            "PNEUMONIA": float(prediction)
+            "NORMAL": f"{float(1 - prediction):.1%}",
+            "PNEUMONIA": f"{float(prediction):.1%}"
         },
         "model_used": model_name,
         "timestamp": datetime.now().isoformat()
@@ -198,7 +226,7 @@ async def predict(file: UploadFile = File(...)):
         file: Archivo de imagen (JPG, PNG)
 
     Returns:
-        JSON con predicción y probabilidades
+        JSON con predicción y mensaje descriptivo
     """
     try:
         if not file.content_type.startswith('image/'):
@@ -222,7 +250,7 @@ async def predict(file: UploadFile = File(...)):
         img_array = preprocess_image(image)
         result = make_prediction(img_array)
 
-        logger.info(f"✅ Predicción: {result['prediction']} ({result['confidence']:.2%})")
+        logger.info(f"✅ Predicción: {result['prediction']} ({result['confidence']}) - Confianza: {result['nivel_confianza']}")
 
         return JSONResponse(content=result)
 
@@ -245,7 +273,7 @@ async def predict_base64(data: dict):
         data: {"image": "base64_string"}
 
     Returns:
-        JSON con predicción
+        JSON con predicción y mensaje descriptivo
     """
     try:
         if "image" not in data:
@@ -269,7 +297,7 @@ async def predict_base64(data: dict):
         img_array = preprocess_image(image)
         result = make_prediction(img_array)
 
-        logger.info(f"✅ Predicción: {result['prediction']} ({result['confidence']:.2%})")
+        logger.info(f"✅ Predicción: {result['prediction']} ({result['confidence']}) - Confianza: {result['nivel_confianza']}")
 
         return JSONResponse(content=result)
 
