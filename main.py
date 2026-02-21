@@ -71,7 +71,7 @@ if not model_path.exists():
     logger.info("⬇️ Descargando modelo desde Google Drive...")
     try:
         url = f"https://drive.google.com/uc?id={GDRIVE_ID}&confirm=t"
-	gdown.download(url, str(model_path), quiet=False, fuzzy=True)
+    gdown.download(url, str(model_path), quiet=False, fuzzy=True)
         logger.info("✅ Modelo descargado correctamente")
     except Exception as e:
         logger.error(f"❌ Error descargando modelo: {e}")
