@@ -71,7 +71,7 @@ if not model_path.exists():
     logger.info("⬇️ Descargando modelo desde Google Drive...")
     try:
         url = f"https://drive.google.com/uc?id={GDRIVE_ID}&confirm=t"
-    gdown.download(url, str(model_path), quiet=False, fuzzy=True)
+        gdown.download(url, str(model_path), quiet=False, fuzzy=True)
         logger.info("✅ Modelo descargado correctamente")
     except Exception as e:
         logger.error(f"❌ Error descargando modelo: {e}")
@@ -79,7 +79,7 @@ if not model_path.exists():
 # Cargar modelo
 if model_path.exists():
     try:
-        model = keras.models.load_model(model_path, compile=False)
+        model = keras.models.load_model(str(model_path), compile=False)
         model_name = "VGG16 Fine-tuned"
         logger.info(f"✅ Modelo cargado: {model_name}")
     except Exception as e:
@@ -89,6 +89,7 @@ if model is None:
     logger.error("❌ No se pudo cargar ningún modelo")
 else:
     logger.info(f"✅ API lista con modelo: {model_name}")
+
 # ════════════════════════════════════════════════════════════════════
 # SECCIÓN 4: FUNCIONES AUXILIARES
 # ════════════════════════════════════════════════════════════════════
@@ -96,36 +97,32 @@ else:
 def preprocess_image(image: Image.Image) -> np.ndarray:
     """
     Preprocesa imagen para el modelo
-    
+
     Args:
         image: Imagen PIL
-        
+
     Returns:
         np.ndarray: Array normalizado (1, 224, 224, 3)
     """
-    # Convertir a RGB si es necesario
     if image.mode != 'RGB':
         image = image.convert('RGB')
-    
-    # Redimensionar
+
     image = image.resize(IMG_SIZE)
-    
-    # Convertir a array y normalizar
+
     img_array = np.array(image)
     img_array = img_array.astype('float32') / 255.0
-    
-    # Agregar dimensión de batch
     img_array = np.expand_dims(img_array, axis=0)
-    
+
     return img_array
+
 
 def make_prediction(img_array: np.ndarray) -> dict:
     """
     Realiza predicción usando el modelo cargado
-    
+
     Args:
         img_array: Imagen preprocesada
-        
+
     Returns:
         dict: Resultado con predicción y probabilidades
     """
@@ -134,15 +131,12 @@ def make_prediction(img_array: np.ndarray) -> dict:
             status_code=503,
             detail="Modelo no disponible. Verifica carpeta 'models/'"
         )
-    
-    # Hacer predicción
+
     prediction = model.predict(img_array, verbose=0)[0][0]
-    
-    # Determinar clase
+
     predicted_class = "PNEUMONIA" if prediction > 0.5 else "NORMAL"
     confidence = float(prediction if prediction > 0.5 else 1 - prediction)
-    
-    # Construir respuesta
+
     result = {
         "prediction": predicted_class,
         "confidence": confidence,
@@ -153,7 +147,7 @@ def make_prediction(img_array: np.ndarray) -> dict:
         "model_used": model_name,
         "timestamp": datetime.now().isoformat()
     }
-    
+
     return result
 
 # ════════════════════════════════════════════════════════════════════
@@ -182,6 +176,7 @@ async def root():
         }
     }
 
+
 @app.get("/health")
 async def health_check():
     """Endpoint de health check - Verifica estado"""
@@ -193,50 +188,44 @@ async def health_check():
         "message": "API funcionando correctamente" if model else "API sin modelo cargado"
     }
 
+
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     """
     Predicción con archivo de imagen
-    
+
     Args:
         file: Archivo de imagen (JPG, PNG)
-        
+
     Returns:
         JSON con predicción y probabilidades
     """
     try:
-        # Validar tipo
         if not file.content_type.startswith('image/'):
             raise HTTPException(
                 status_code=400,
                 detail=f"Archivo debe ser imagen. Recibido: {file.content_type}"
             )
-        
-        # Leer archivo
+
         contents = await file.read()
-        
-        # Validar tamaño (10 MB máx)
+
         if len(contents) > 10 * 1024 * 1024:
             raise HTTPException(
                 status_code=413,
                 detail="Imagen muy grande. Máximo: 10 MB"
             )
-        
-        # Abrir imagen
+
         image = Image.open(io.BytesIO(contents))
-        
+
         logger.info(f"📸 Imagen: {file.filename}, Tamaño: {image.size}")
-        
-        # Preprocesar
+
         img_array = preprocess_image(image)
-        
-        # Predecir
         result = make_prediction(img_array)
-        
+
         logger.info(f"✅ Predicción: {result['prediction']} ({result['confidence']:.2%})")
-        
+
         return JSONResponse(content=result)
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -246,26 +235,25 @@ async def predict(file: UploadFile = File(...)):
             detail=f"Error procesando imagen: {str(e)}"
         )
 
+
 @app.post("/predict_base64")
 async def predict_base64(data: dict):
     """
     Predicción con imagen en base64
-    
+
     Args:
         data: {"image": "base64_string"}
-        
+
     Returns:
         JSON con predicción
     """
     try:
-        # Validar campo
         if "image" not in data:
             raise HTTPException(
                 status_code=400,
                 detail='Campo "image" requerido con string base64'
             )
-        
-        # Decodificar
+
         try:
             image_data = base64.b64decode(data["image"])
         except Exception as e:
@@ -273,22 +261,18 @@ async def predict_base64(data: dict):
                 status_code=400,
                 detail=f"Error decodificando base64: {str(e)}"
             )
-        
-        # Abrir imagen
+
         image = Image.open(io.BytesIO(image_data))
-        
+
         logger.info(f"📸 Imagen base64, Tamaño: {image.size}")
-        
-        # Preprocesar
+
         img_array = preprocess_image(image)
-        
-        # Predecir
         result = make_prediction(img_array)
-        
+
         logger.info(f"✅ Predicción: {result['prediction']} ({result['confidence']:.2%})")
-        
+
         return JSONResponse(content=result)
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -298,22 +282,23 @@ async def predict_base64(data: dict):
             detail=f"Error procesando imagen: {str(e)}"
         )
 
+
 # ════════════════════════════════════════════════════════════════════
 # PUNTO DE ENTRADA (Solo para desarrollo local)
 # ════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     print("""
     ╔════════════════════════════════════════════════════════════════╗
     ║  API DE DETECCIÓN DE NEUMONÍA - SERVIDOR LOCAL                ║
     ╚════════════════════════════════════════════════════════════════╝
-    
+
     Servidor: http://localhost:8000
     Documentación: http://localhost:8000/docs
-    
+
     Presiona Ctrl+C para detener
     """)
-    
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
