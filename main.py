@@ -23,6 +23,8 @@ import base64
 from datetime import datetime
 import logging
 from pathlib import Path
+import gdown
+import os
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -53,34 +55,40 @@ app.add_middleware(
 # SECCIÓN 3: CARGAR MODELO
 # ════════════════════════════════════════════════════════════════════
 
-MODEL_DIR = Path(__file__).parent / ("models")
+MODEL_DIR = Path(__file__).parent / "models"
+MODEL_DIR.mkdir(exist_ok=True)
 IMG_SIZE = (224, 224)
 
-# Intentar cargar modelo en orden de preferencia
 model = None
 model_name = None
 
-model_priority = [
-    ('mobilenet_pneumonia.h5', 'MobileNet Pneumonia'),
-]
+GDRIVE_ID = "1KfbTK9PHvh6xivp2ap2s-Yi2USmA656Z"
+MODEL_FILENAME = "vgg16_finetuned.keras"
+model_path = MODEL_DIR / MODEL_FILENAME
 
-for filename, name in model_priority:
-    model_path = MODEL_DIR / filename
-    if model_path.exists():
-        try:
-            model = keras.models.load_model(model_path)
-            model_name = name
-            logger.info(f"✅ Modelo cargado: {name}")
-            break
-        except Exception as e:
-            logger.error(f"❌ Error cargando {name}: {e}")
-            continue
+# Descargar modelo si no existe
+if not model_path.exists():
+    logger.info("⬇️ Descargando modelo desde Google Drive...")
+    try:
+        url = f"https://drive.google.com/uc?id={GDRIVE_ID}"
+        gdown.download(url, str(model_path), quiet=False)
+        logger.info("✅ Modelo descargado correctamente")
+    except Exception as e:
+        logger.error(f"❌ Error descargando modelo: {e}")
+
+# Cargar modelo
+if model_path.exists():
+    try:
+        model = keras.models.load_model(model_path, compile=False)
+        model_name = "VGG16 Fine-tuned"
+        logger.info(f"✅ Modelo cargado: {model_name}")
+    except Exception as e:
+        logger.error(f"❌ Error cargando modelo: {e}")
 
 if model is None:
     logger.error("❌ No se pudo cargar ningún modelo")
 else:
     logger.info(f"✅ API lista con modelo: {model_name}")
-
 # ════════════════════════════════════════════════════════════════════
 # SECCIÓN 4: FUNCIONES AUXILIARES
 # ════════════════════════════════════════════════════════════════════
